@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <ncurses.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 #define GAME_WIDTH 30
 #define GAME_HEIGHT 20
@@ -12,121 +13,183 @@
 #define MAX_ASTEROIDS 5
 #define MAX_BULLETS 5
 
-#define PLAYER_1_LEFT 'a'
-#define PLAYER_1_RIGHT 'd'
-#define PLAYER_1_FIRE 'w'
+#define WALL_BRICK "#"
+#define BULLET "|"
+#define ASTEROID "O"
+#define BLANK_SPACE " "
 
-#define PLAYER_2_LEFT 'j'
-#define PLAYER_2_RIGHT 'l'
-#define PLAYER_2_FIRE 'i'
+#define PLAYER_LEFT 'a'
+#define PLAYER_RIGHT 'd'
+#define PLAYER_FIRE 'w'
 
 typedef struct {
-    int x, y;
-    int active;
-    int owner;
+	int x, y;
+	int active;
+	int owner;
 } Bullet;
 
 typedef struct {
-    int x, y;
-    int active;
+	int x, y;
+	int active;
 } Asteroid;
 
 typedef struct {
-    int id;
-    int x, y;
-    int score;
-    int alive;
-    Bullet bullets[5];
+	int id;
+	int x, y;
+	int score;
+	int alive;
+	Bullet bullets[5];
 } Player;
 
 typedef struct {
-    Player players[4];
-    Asteroid asteroids[5];
+	Player players[4];
+	Asteroid asteroids[5];
 } GameState;
 
 GameState game_state;
 int sock;
 
-void draw_game() {
-    clear();
-    for (int y = 0; y < GAME_HEIGHT; y++) {
-        for (int x = 0; x < GAME_WIDTH; x++) {
+void draw_game()
+{
+	clear();
+	for (int y = 0; y < GAME_HEIGHT; y++) {
+		for (int x = 0; x < GAME_WIDTH; x++) {
 			/* print boundry walls */
 			if (   y == 0 || (y == GAME_HEIGHT - 1)
 					|| x == 0 || (x == GAME_WIDTH - 1)
 			   ){
-				mvprintw(y, x, "%c", '#');
+				mvprintw(y, x, WALL_BRICK);
 			} else {
 				int drawn = 0;
+				/* draw game player and bullets */
 				for (int i = 0; i < MAX_PLAYERS; i++) {
 					for (int j = 0; j < MAX_BULLETS; j++) {
 						if (game_state.players[i].alive && game_state.players[i].x == x && game_state.players[i].y == GAME_HEIGHT - 2) {
 							mvprintw(GAME_HEIGHT - 2, x, "^");
 							drawn = 1;
 						}
+						/* draw bullets */
 						if (game_state.players[i].bullets[j].active && game_state.players[i].bullets[j].x == x && game_state.players[i].bullets[j].y == y)
 						{
-							mvprintw(y, x, "|");
+							mvprintw(y, x, BULLET);
 							drawn = 1;
 						}
 					}
 				}
+				/* draw asteroids */
 				for (int i = 0; i < MAX_ASTEROIDS; i++) {
 					if (game_state.asteroids[i].active && game_state.asteroids[i].x == x && game_state.asteroids[i].y == y) {
-						mvprintw(y, x, "O");
+						mvprintw(y, x, ASTEROID);
 						drawn = 1;
 					}
 				}
-				if (!drawn) mvprintw(y, x, " ");
+				/* draw blank space */
+				if (!drawn) mvprintw(y, x, BLANK_SPACE);
 			}
 		}
-    }
+	}
+	/* draw player scores */
 	mvprintw(GAME_HEIGHT + 1, 0, "Player scores: ");
 	for (int i = 0; i < 4; i++) {
 		mvprintw(GAME_HEIGHT + i + 2, 0, "Player%d: %d", i + 1, game_state.players[i].score);
 	}
-    refresh();
+	refresh();
 }
 
-void* handle_input(void* arg) {
-    char command;
-    while (1) {
-        int ch = getch();
-        if      (ch == PLAYER_1_LEFT) command = 'L';
-		else if (ch == PLAYER_1_RIGHT) command = 'R';
-		else if (ch == PLAYER_1_FIRE) command = 'F';
+void* handle_input(void* arg)
+{
+	int ret = -1;
+	char command;
 
-		else if (ch == PLAYER_2_LEFT) command = 'L';
-		else if (ch == PLAYER_2_RIGHT) command = 'R';
-		else if (ch == PLAYER_2_FIRE) command = 'F';
-
+	while (1) {
+		int ch = getch();
+		if (ch == PLAYER_LEFT)
+			command = 'L';
+		else if (ch == PLAYER_RIGHT)
+			command = 'R';
+		else if (ch == PLAYER_FIRE)
+			command = 'F';
 		else continue;
-		//printw("%c", command);
 
-        send(sock, &command, sizeof(command), 0);
-    }
-    return NULL;
+		ret = send(sock, &command, sizeof(command), 0);
+		if (ret < 0){
+			printf("send failed: %s (errno: %d)\n", strerror(errno), errno);
+			pthread_exit((void*)-1);
+		}
+	}
+	return NULL;
 }
 
-int main() {
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in server_addr = {AF_INET, htons(8080), inet_addr("127.0.0.1")};
-    connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+void close_socket(int fd)
+{
+	if (fd >= 0)
+		close(fd);
+}
 
-    initscr();
-    noecho();
-    curs_set(0);
+int setup_screen(WINDOW *window)
+{
+	int ret = -1;
 
-    pthread_t input_thread;
-    pthread_create(&input_thread, NULL, handle_input, NULL);
+	window = initscr();
+	if (window == NULL){
+		printf("initscr failed: %s (errno: %d)\n", strerror(errno), errno);
+		return -EXIT_FAILURE;
+	}
 
-    while(1)
+	noecho();
+
+	ret = curs_set(0);
+	if (ret < 0){
+		printf("curs_set failed: %s (errno: %d)\n", strerror(errno), errno);
+		return -EXIT_FAILURE;
+	}
+}
+
+int main()
+{
+	int ret = -1;
+	WINDOW *win;
+
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in server_addr = {AF_INET, htons(8080), inet_addr("127.0.0.1")};
+	ret = connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+	if (ret < 0){
+		printf("connect failed: %s (errno: %d)\n", strerror(errno), errno);
+		goto END;
+	}
+
+	ret = setup_screen(win);
+	if (ret < 0){
+		printf("setup screen failed: %s (errno: %d)\n", strerror(errno), errno);
+		goto END;
+	}
+
+	pthread_t input_thread;
+	ret = pthread_create(&input_thread, NULL, handle_input, NULL);
+	if (ret < 0){
+		printf("Creating thread failed: %s (errno: %d)\n", strerror(errno), errno);
+		goto END;
+	}
+
+	while(1)
 	{
-		recv(sock, &game_state, sizeof(GameState), 0);
-        draw_game();
-    }
+		ssize_t bytes_read = recv(sock, &game_state, sizeof(GameState), 0);
+		if (bytes_read < 0)
+		{
+			printf("Creating thread failed: %s (errno: %d)\n", strerror(errno), errno);
+			break;
+		}
+		else if (bytes_read == 0)
+		{
+			printf("Server disconnected.\n");
+			break;
+		}
 
-    endwin();
-    return 0;
+		draw_game();
+	}
+
+END:
+	close_socket(sock);
+	endwin();
+	return 0;
 }
-
