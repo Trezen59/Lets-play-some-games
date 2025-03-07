@@ -1,15 +1,22 @@
-CC=gcc
-LIBS=-lncurses -lpthread
-CFLAGS=-Wall -g
-SNAKE_GAME_SOURCE=snake_game.c
-SNAKE_BIN_NAME=snake
+CC= gcc
+TARGET= snake_game
+SERVER_TARGET= server
+CLIENT_TARGET= client
+ALL_TARGET= $(TARGET) $(SERVER_TARGET) $(CLIENT_TARGET) tags
+CLIBS= -lncurses -lpthread
+FLAGS= -g
 
-all:
-	$(CC) $(CFLAGS) $(SNAKE_GAME_SOURCE) -o $(SNAKE_BIN_NAME) $(LIBS)
-	ctags -R &
+all: clean game server client
+	ctags -R *
 
-tags:
-	ctags -R &
+game:
+	$(CC) $(FLAGS) $(TARGET).c -o $(TARGET) $(CLIBS)
+
+server:
+	$(CC) $(FLAGS) $(SERVER_TARGET).c -o $(SERVER_TARGET) $(CLIBS)
+
+client:
+	$(CC) $(FLAGS) $(CLIENT_TARGET).c -o $(CLIENT_TARGET) $(CLIBS)
 
 clean:
-	rm -rf $(BIN_NAME) tags
+	rm -rf $(ALL_TARGET)
