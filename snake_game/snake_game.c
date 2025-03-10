@@ -95,10 +95,22 @@ void init_snake(Snake *snake, int length, int dir)
 	}
 }
 
-void place_food()
+void place_food(Snake *snake)
 {
-	food.x = start_x + rand() % (WIDTH - 2) + 1;
-	food.y = start_y + rand() % (HEIGHT - 2) + 1;
+	bool valid_food_position = false;
+
+	while (!valid_food_position) {
+		food.x = start_x + rand() % (WIDTH - 2) + 1;
+		food.y = start_y + rand() % (HEIGHT - 2) + 1;
+
+		valid_food_position = true;
+		for (int i = 0; i < snake->length; i++) {
+			if (snake->body[i].x == food.x && snake->body[i].y == food.y) {
+				valid_food_position = false;
+				break;
+			}
+		}
+	}
 }
 
 void draw_walls()
@@ -163,7 +175,7 @@ void move_snake(Snake *snake)
 	if (snake->body[0].x == food.x && snake->body[0].y == food.y) {
 		snake->length++;
 		/* Make more food */
-		place_food();
+		place_food(snake);
 	}
 }
 
@@ -198,7 +210,7 @@ int main()
 	Snake snake;
 
 	init_snake(&snake, snake_length, RIGHT);
-	place_food();
+	place_food(&snake);
 
 	/* Game loop */
 	while (!game_over) {
