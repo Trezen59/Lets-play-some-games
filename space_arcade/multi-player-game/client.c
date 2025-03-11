@@ -7,20 +7,25 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#define GAME_WIDTH 30
-#define GAME_HEIGHT 20
-#define MAX_PLAYERS 4
-#define MAX_ASTEROIDS 5
-#define MAX_BULLETS 5
+#define GAME_WIDTH     30
+#define GAME_HEIGHT    20
+#define MAX_PLAYERS    4
+#define MAX_ASTEROIDS  5
+#define MAX_BULLETS    5
 
-#define WALL_BRICK "#"
-#define BULLET "|"
-#define ASTEROID "O"
-#define BLANK_SPACE " "
+#define WALL_BRICK    "#"
+#define BULLET        "|"
+#define ASTEROID      "O"
+#define BLANK_SPACE   " "
+#define SHOOTER       "^"
 
-#define PLAYER_LEFT 'a'
-#define PLAYER_RIGHT 'd'
-#define PLAYER_FIRE 'w'
+#define PLAYER_LEFT   'a'
+#define PLAYER_RIGHT  'd'
+#define PLAYER_FIRE   'w'
+
+#define COMMAND_LEFT  'L'
+#define COMMAND_RIGHT 'R'
+#define COMMAND_FIRE  'F'
 
 typedef struct {
 	int x, y;
@@ -38,12 +43,12 @@ typedef struct {
 	int x, y;
 	int score;
 	int alive;
-	Bullet bullets[5];
+	Bullet bullets[MAX_BULLETS];
 } Player;
 
 typedef struct {
-	Player players[4];
-	Asteroid asteroids[5];
+	Player players[MAX_PLAYERS];
+	Asteroid asteroids[MAX_ASTEROIDS];
 } GameState;
 
 GameState game_state;
@@ -65,7 +70,7 @@ void draw_game()
 				for (int i = 0; i < MAX_PLAYERS; i++) {
 					for (int j = 0; j < MAX_BULLETS; j++) {
 						if (game_state.players[i].alive && game_state.players[i].x == x && game_state.players[i].y == GAME_HEIGHT - 2) {
-							mvprintw(GAME_HEIGHT - 2, x, "^");
+							mvprintw(GAME_HEIGHT - 2, x, SHOOTER);
 							drawn = 1;
 						}
 						/* draw bullets */
@@ -103,12 +108,9 @@ void* handle_input(void* arg)
 
 	while (1) {
 		int ch = getch();
-		if (ch == PLAYER_LEFT)
-			command = 'L';
-		else if (ch == PLAYER_RIGHT)
-			command = 'R';
-		else if (ch == PLAYER_FIRE)
-			command = 'F';
+		if      (ch == PLAYER_LEFT)  command = COMMAND_LEFT;
+		else if (ch == PLAYER_RIGHT) command = COMMAND_RIGHT;
+		else if (ch == PLAYER_FIRE)  command = COMMAND_FIRE;
 		else continue;
 
 		ret = send(sock, &command, sizeof(command), 0);

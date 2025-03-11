@@ -1,37 +1,6 @@
 #include "main.h"
+
 using namespace std;
-
-#define GAME_HEIGHT 10
-#define GAME_WIDTH 30
-
-#define WALL_BRICK "#"
-#define TARGET "O"
-#define TANK_HEAD '^'
-#define BULLET '|'
-
-typedef enum {
-	UP = 0,
-	DOWN,
-	LEFT,
-	RIGHT,
-} Direction;
-
-typedef struct{
-	int x, y;
-	int active;
-} Position;
-
-class Tank {
-	public:
-		char tank_head;
-		int direction;
-		Position tank;
-		int key_left, key_right, key_fire;
-		char fire;
-		bool alive;
-		Position bullets[5];
-		int score;
-};
 
 Tank tank_player_1;
 Position enemy;
@@ -53,8 +22,9 @@ void init_player()
 	tank_player_1.tank.x = GAME_WIDTH / 2;
 	tank_player_1.tank.y = GAME_HEIGHT - 2;
 
-	tank_player_1.key_left = KEY_LEFT;
-	tank_player_1.key_right = KEY_RIGHT;
+	tank_player_1.key_left = LEFT_KEY;
+	tank_player_1.key_right = RIGHT_KEY;
+	tank_player_1.key_fire = FIRE_KEY;
 
 	tank_player_1.fire = (char)BULLET;
 	tank_player_1.alive = true;
@@ -69,7 +39,7 @@ void init_player()
 
 void check_collision()
 {
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < MAX_BULLETS; i++)
 	{
 		if (tank_player_1.bullets[i].active)
 		{
@@ -86,7 +56,7 @@ void check_collision()
 }
 
 void update_bullets(){
-	for (int i = 0; i < 5; i++)
+	for (int i = 0; i < MAX_BULLETS; i++)
 	{
 		if (tank_player_1.bullets[i].active)
 		{
@@ -104,7 +74,7 @@ void update_bullets(){
 }
 
 void fire_bullet(){
-	for (int i = 0; i < 5; i++){
+	for (int i = 0; i < MAX_BULLETS; i++){
 		if ( !tank_player_1.bullets[i].active ){
 			tank_player_1.bullets[i].x = tank_player_1.tank.x;
 			tank_player_1.bullets[i].y = tank_player_1.tank.y;
@@ -186,10 +156,10 @@ void process_input()
 			flushinp();
 		}
 	}
-	if ( ch == 'q'){
+	if ( ch == QUIT_KEY){
 		game_over = 1;
 	}
-	if ( ch == ' '){
+	if ( ch == tank_player_1.key_fire){
 			fire_bullet();
 	}
 }
@@ -199,7 +169,7 @@ void init_game_settings()
 	initscr();
 	noecho();
 	curs_set(FALSE);
-	timeout(100);
+	timeout(INPUT_WAIT_TIMEOUT_MS);
 	keypad(stdscr, TRUE);
 	srand(time(0));
 }
@@ -209,7 +179,7 @@ void exit_game()
 	clear();
 	endwin();
 	cout << "Game Over!\n";
-	cout << "Score: Player1: "<< tank_player_1.score << endl;
+	cout << "Score:\nPlayer : "<< tank_player_1.score << endl;
 }
 
 int main()
@@ -225,7 +195,7 @@ int main()
 		update_bullets();
 		check_collision();
 		draw_game();
-		usleep(100000);
+		usleep(GAME_UPDATE_SPEED_US);
 	}
 
 	exit_game();

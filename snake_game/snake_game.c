@@ -6,15 +6,23 @@
 
 char *VERSION = "0.0.1";
 
+#define INPUT_WAIT_TIMEOUT_MS 100
+#define GAME_UPDATE_SPEED_US 100000
+
 #define WALL_BRICK	"#"
 #define FOOD		"*"
 #define SNAKE_BODY	"o"
 #define SNAKE_HEAD	"O"
 
-#define HEAD		0
+#define HEAD_POS	0
 #define MAXLEN		100
 #define WIDTH		30
 #define HEIGHT		20
+
+#define UP_KEY 'w'
+#define DOWN_KEY 's'
+#define LEFT_KEY 'a'
+#define RIGHT_KEY 'd'
 
 /* Direction Enum */
 typedef enum {
@@ -32,14 +40,14 @@ typedef struct {
 /* Define Snake struct */
 typedef struct {
 	/* Max length */
-	Position body[100];
+	Position body[MAXLEN];
 	int length;
 	int direction;
+	int score;
 } Snake;
 
 /* global declarations */
 Position food;
-
 int start_x, start_y;
 
 /* Monitor game over */
@@ -72,7 +80,7 @@ int init_game()
 	/* Sets input wait time
 	   Adjust speed of snake
 	*/
-	timeout(100);
+	timeout(INPUT_WAIT_TIMEOUT_MS);
 
 	/* sequence of psuedo random integers */
 	srand(time(0));
@@ -85,6 +93,7 @@ void init_snake(Snake *snake, int length, int dir)
 	/* Initialize snake */
 	snake->length = length;
 	snake->direction = dir;
+	snake->score = 0;
 
 	int center_x = start_x + WIDTH / 2;
 	int center_y = start_y + HEIGHT / 2;
@@ -134,23 +143,27 @@ void draw_snake(Snake *snake)
 
 	for (int i = 0; i < snake->length; i++) {
 		mvprintw(snake->body[i].y, snake->body[i].x,
-				(i == HEAD) ? SNAKE_HEAD : SNAKE_BODY);
+				(i == HEAD_POS) ? SNAKE_HEAD : SNAKE_BODY);
 	}
+
+	/* draw player scores */
+	mvprintw(start_y + HEIGHT + 1, start_x, "Player scores: %d", snake->score);
+
 	refresh();
 }
 
 int check_collision(Snake *snake)
 {
 	/* Collision check (wall) */
-	if (snake->body[HEAD].x <= start_x || snake->body[HEAD].x >= start_x + WIDTH - 1 ||
-			snake->body[HEAD].y <= start_y || snake->body[HEAD].y >= start_y + HEIGHT - 1) {
+	if (snake->body[HEAD_POS].x <= start_x || snake->body[HEAD_POS].x >= start_x + WIDTH - 1 ||
+			snake->body[HEAD_POS].y <= start_y || snake->body[HEAD_POS].y >= start_y + HEIGHT - 1) {
 		game_over = 1;
 	}
 
 	/* Collision check (self) */
 	for (int i = 1; i < snake->length; i++) {
-		if (snake->body[HEAD].x == snake->body[i].x &&
-				snake->body[HEAD].y == snake->body[i].y) {
+		if (snake->body[HEAD_POS].x == snake->body[i].x &&
+				snake->body[HEAD_POS].y == snake->body[i].y) {
 			game_over = 1;
 		}
 	}
@@ -166,14 +179,18 @@ void move_snake(Snake *snake)
 	}
 
 	/* Move head */
-	if      (snake->direction == UP)	snake->body[0].y--;
-	else if (snake->direction == DOWN)	snake->body[0].y++;
-	else if (snake->direction == LEFT)	snake->body[0].x--;
-	else if (snake->direction == RIGHT) snake->body[0].x++;
+	if      (snake->direction == UP)	snake->body[HEAD_POS].y--;
+	else if (snake->direction == DOWN)	snake->body[HEAD_POS].y++;
+	else if (snake->direction == LEFT)	snake->body[HEAD_POS].x--;
+	else if (snake->direction == RIGHT) snake->body[HEAD_POS].x++;
 
 	/* Check if food is eaten */
-	if (snake->body[0].x == food.x && snake->body[0].y == food.y) {
+	if (snake->body[HEAD_POS].x == food.x && snake->body[HEAD_POS].y == food.y) {
 		snake->length++;
+
+		/* Update score if food is eaten */
+		snake->score++;
+
 		/* Make more food */
 		place_food(snake);
 	}
@@ -184,10 +201,10 @@ int process_input(Snake *snake)
 	int ch = getch();
 
 	/* do not move in opposite direction */
-	if      (ch == 'w' && snake->direction != DOWN)		snake->direction = UP;
-	else if (ch == 's' && snake->direction != UP)		snake->direction = DOWN;
-	else if (ch == 'a' && snake->direction != RIGHT)	snake->direction = LEFT;
-	else if (ch == 'd' && snake->direction != LEFT)		snake->direction = RIGHT;
+	if      (ch == UP_KEY    && snake->direction != DOWN)  snake->direction = UP;
+	else if (ch == DOWN_KEY  && snake->direction != UP)    snake->direction = DOWN;
+	else if (ch == LEFT_KEY  && snake->direction != RIGHT) snake->direction = LEFT;
+	else if (ch == RIGHT_KEY && snake->direction != LEFT)  snake->direction = RIGHT;
 	return 0;
 }
 
@@ -219,11 +236,12 @@ int main()
 		check_collision(&snake);
 		draw_snake(&snake);
 		/* Sleep to control game update speed */
-		usleep(100000);
+		usleep(GAME_UPDATE_SPEED_US);
 	}
 
 	clear();
 	printw("Game Over!\n");
+	printw("Player score: %d\n", snake.score);
 	printw("Press any key to exit...");
 	refresh();
 
